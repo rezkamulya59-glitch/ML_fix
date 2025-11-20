@@ -21,11 +21,12 @@ Aplikasi ini memprediksi kemungkinan seseorang mengalami stroke berdasarkan prof
 @st.cache_resource
 def load_model():
     try:
-        with open('best_stroke_model.pkl', 'rb') as file:
+        # Load the complete model data (contains model, scaler, and encoders)
+        with open('model_terbaik.pkl', 'rb') as file:
             model_data = pickle.load(file)
         return model_data
     except FileNotFoundError:
-        st.error("File model 'best_stroke_model.pkl' tidak ditemukan. Pastikan model telah dilatih dan disimpan.")
+        st.error("File model 'model_terbaik.pkl' tidak ditemukan. Pastikan model telah dilatih dan disimpan.")
         return None
 
 model_data = load_model()
@@ -37,13 +38,17 @@ if model_data is not None:
     numerical_columns = model_data['numerical_columns']
     categorical_columns = model_data['categorical_columns']
 
+    # Remove 'id' from numerical_columns if it exists, as it shouldn't be used for prediction
+    if 'id' in numerical_columns:
+        numerical_columns = [col for col in numerical_columns if col != 'id']
+
     # Create two columns for layout
     col1, col2 = st.columns([1, 1])
 
     with col1:
         st.header("Fitur Input")
         
-        # Numerical inputs
+        # Numerical inputs (excluding 'id')
         age = st.slider("Usia", min_value=1, max_value=100, value=40, 
                         help="Usia dalam tahun")
         avg_glucose_level = st.slider("Rata-rata Kadar Glukosa", min_value=50, max_value=300, value=100,
@@ -53,9 +58,9 @@ if model_data is not None:
         
         # Categorical inputs
         gender = st.selectbox("Jenis Kelamin", ["Male", "Female"])
-        hypertension = st.selectbox("Hipertensi", ["Tidak", "Ya"])
-        heart_disease = st.selectbox("Penyakit Jantung", ["Tidak", "Ya"])
-        ever_married = st.selectbox("Pernah Menikah", ["Tidak", "Ya"])
+        hypertension = st.selectbox("Hipertensi", ["0", "1"], format_func=lambda x: "Tidak" if x == "0" else "Ya")
+        heart_disease = st.selectbox("Penyakit Jantung", ["0", "1"], format_func=lambda x: "Tidak" if x == "0" else "Ya")
+        ever_married = st.selectbox("Pernah Menikah", ["No", "Yes"])
 
     with col2:
         st.header("Fitur Tambahan")
@@ -67,15 +72,15 @@ if model_data is not None:
 
     # Create a button to make prediction
     if st.button("🔮 Prediksi Risiko Stroke", type="primary"):
-        # Create a dataframe with the input values
+        # Create a dataframe with the input values (excluding 'id')
         input_data = pd.DataFrame({
             'gender': [gender],
             'age': [age],
-            'hypertension': [1 if hypertension == "Ya" else 0],
-            'heart_disease': [1 if heart_disease == "Ya" else 0],
+            'hypertension': [int(hypertension)],
+            'heart_disease': [int(heart_disease)],
             'ever_married': [ever_married],
             'work_type': [work_type],
-            'Residence_type': [residence_type],  # Note: Original dataset has this as 'Residence_type'
+            'Residence_type': [residence_type],
             'avg_glucose_level': [avg_glucose_level],
             'bmi': [bmi],
             'smoking_status': [smoking_status]
@@ -105,7 +110,9 @@ if model_data is not None:
 
             # Scale numerical features using the saved scaler
             input_scaled = input_encoded.copy()
-            input_scaled[numerical_columns] = scaler.transform(input_encoded[numerical_columns])
+            # Only scale the numerical columns that were used during training (excluding 'id')
+            cols_to_scale = [col for col in numerical_columns if col in input_encoded.columns]
+            input_scaled[cols_to_scale] = scaler.transform(input_encoded[cols_to_scale])
             
             # Make prediction
             prediction = model.predict(input_scaled)
@@ -121,7 +128,7 @@ if model_data is not None:
                 st.subheader("Hasil Prediksi")
                 if prediction[0] == 1:
                     st.error("🚨 RISIKO TINGGI: Pasien ini berisiko mengalami stroke!")
-                    st.image("https://cdn-icons-png.flaticon.com/512/2972/2972585.png", width=100)
+                    st.image("https://cdn-icons-png.flaticon.com/512/2972/2972585.png", width=10)
                 else:
                     st.success("✅ RISIKO RENDAH: Pasien ini berisiko rendah mengalami stroke!")
                     st.image("https://cdn-icons-png.flaticon.com/512/2972/2972590.png", width=100)
@@ -145,8 +152,8 @@ if model_data is not None:
             features_info.append(f"- Usia: {age} tahun {'(usia tua, risiko lebih tinggi)' if age > 50 else '(usia muda, risiko lebih rendah)'}")
             features_info.append(f"- Kadar Glukosa: {avg_glucose_level} mg/dL {'(tinggi, risiko lebih tinggi)' if avg_glucose_level > 120 else '(normal, risiko lebih rendah)'}")
             features_info.append(f"- BMI: {bmi} {'(tinggi, risiko lebih tinggi)' if bmi > 30 else '(normal, risiko lebih rendah)'}")
-            features_info.append(f"- Hipertensi: {hypertension} {'(faktor risiko penting)' if hypertension == 'Ya' else ''}")
-            features_info.append(f"- Penyakit Jantung: {heart_disease} {'(faktor risiko penting)' if heart_disease == 'Ya' else ''}")
+            features_info.append(f"- Hipertensi: {'Ya' if int(hypertension) == 1 else 'Tidak'} {'(faktor risiko penting)' if hypertension == '1' else ''}")
+            features_info.append(f"- Penyakit Jantung: {'Ya' if int(heart_disease) == 1 else 'Tidak'} {'(faktor risiko penting)' if heart_disease == '1' else ''}")
             
             for info in features_info:
                 st.write(info)
@@ -168,4 +175,4 @@ if model_data is not None:
         """)
         
 else:
-    st.error("Tidak dapat memuat model. Pastikan 'best_stroke_model.pkl' ada di direktori yang sama dengan aplikasi ini.")
+    st.error("Tidak dapat memuat model. Pastikan 'model_terbaik.pkl' ada di direktori yang sama dengan aplikasi ini.")
