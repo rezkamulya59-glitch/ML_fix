@@ -38,13 +38,17 @@ if model_data is not None:
     numerical_columns = model_data['numerical_columns']
     categorical_columns = model_data['categorical_columns']
 
+    # Remove 'id' from numerical_columns if it exists, as it shouldn't be used for prediction
+    if 'id' in numerical_columns:
+        numerical_columns = [col for col in numerical_columns if col != 'id']
+
     # Create two columns for layout
     col1, col2 = st.columns([1, 1])
 
     with col1:
         st.header("Fitur Input")
         
-        # Numerical inputs
+        # Numerical inputs (excluding 'id')
         age = st.slider("Usia", min_value=1, max_value=100, value=40, 
                         help="Usia dalam tahun")
         avg_glucose_level = st.slider("Rata-rata Kadar Glukosa", min_value=50, max_value=300, value=100,
@@ -68,7 +72,7 @@ if model_data is not None:
 
     # Create a button to make prediction
     if st.button("🔮 Prediksi Risiko Stroke", type="primary"):
-        # Create a dataframe with the input values
+        # Create a dataframe with the input values (excluding 'id')
         input_data = pd.DataFrame({
             'gender': [gender],
             'age': [age],
@@ -106,7 +110,9 @@ if model_data is not None:
 
             # Scale numerical features using the saved scaler
             input_scaled = input_encoded.copy()
-            input_scaled[numerical_columns] = scaler.transform(input_encoded[numerical_columns])
+            # Only scale the numerical columns that were used during training (excluding 'id')
+            cols_to_scale = [col for col in numerical_columns if col in input_encoded.columns]
+            input_scaled[cols_to_scale] = scaler.transform(input_encoded[cols_to_scale])
             
             # Make prediction
             prediction = model.predict(input_scaled)
@@ -122,10 +128,10 @@ if model_data is not None:
                 st.subheader("Hasil Prediksi")
                 if prediction[0] == 1:
                     st.error("🚨 RISIKO TINGGI: Pasien ini berisiko mengalami stroke!")
-                    st.image("https://cdn-icons-png.flaticon.com/512/2972/2972585.png", width=100)
+                    st.image("https://cdn-icons-png.flaticon.com/512/2972/2972585.png", width=10)
                 else:
                     st.success("✅ RISIKO RENDAH: Pasien ini berisiko rendah mengalami stroke!")
-                    st.image("https://cdn-icons-png.flaticon.com/512/2972/2972590.png", width=10)
+                    st.image("https://cdn-icons-png.flaticon.com/512/2972/2972590.png", width=100)
             
             with result_col2:
                 st.subheader("Tingkat Kepastian Prediksi")
